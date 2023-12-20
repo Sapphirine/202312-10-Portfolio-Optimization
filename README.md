@@ -3,6 +3,8 @@ The system is developed to automatically make stock holding recommendation each 
 The recommendation is shown daily prior to the trading hours in a webpage that the user can access. 
 The performance of the past recommendation is also shown against S&P 500 performance.
 
+File:
+EECS_6893_final_proj_shared_v1.ipynb was used to choose the best machine learning model to predict stock returns out of XGBoost, LSTM, and Random Forest. XGBoost was determined to be the best model for the system.
 
 File:
 final_eecs6893_port_opt_airflow_v2.py is used to run on the airflow including the following steps:
