@@ -13,8 +13,9 @@ final_eecs6893_port_opt_airflow_v2.py is used to run on the airflow including th
 (2)  fit the machine learning model (XGBoost) and make the 1 day ahead prediction   
 (3)  pull the news feed from finnhub and feed it into finBert   
 (4)  run the weight recommendation based on Black-Litterman model   
-(5)  send the report files to Google Cloud databucket for report shown in the website   
-(6)  The report is shown on the website   
+(5)  send the report files to Google Cloud databucket for report shown in the website
+(6)  delete intermediate dataframes and files
+(7)  The report is shown on the website   
 
 Files #3: files in the Website folder are used to show the report on the website
 
