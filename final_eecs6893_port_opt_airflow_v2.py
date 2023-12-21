@@ -5,11 +5,11 @@
 
 
 # ===========================================================
-# ---- IMPORT Packages
+# ---- IMPORT Required Packages
 # ===========================================================
 # --- location /home/edsharecourse/projdatabucket/
 import finnhub
-finnhub_client = finnhub.Client(api_key="ckjk2vpr01qq18o5vn40ckjk2vpr01qq18o5vn4g")
+finnhub_client = finnhub.Client(api_key="<<MASK>>")
 
 import numpy as np
 import pandas as pd
@@ -101,7 +101,7 @@ from airflow.operators.python import PythonOperator
 count = 0  # --- this is example of global variable in the def
 
 tickers_pull = ['XOM', 'HON', 'RTX', 'AMZN', 'PEP', 'UNH', 'JNJ', 'V', 'NVDA', 'AAPL', 'MSFT', 'GOOGL']
-# tickers_pull = ['XOM', 'HON', 'RTX', 'AMZN', 'PEP', 'UNH']
+
 # ======= initial parameters ============
 
 noofdays_test = 250
@@ -110,8 +110,7 @@ noofdays_lag_live = 30
 
 # Get today's date
 today_real = date.today()
-# after mid night 
-# today = today_real - timedelta(days = 1)
+
 today = today_real
 # print("Today is: ", today)
 
@@ -119,14 +118,12 @@ today = today_real
 yesterday = today - timedelta(days = 1)
 # print("Yesterday was: ", yesterday)
 
-# --- fixed mcaps dec 12
+# --- market capitalization (December 2023, source Yahoo Finance)----
 mcaps = {'XOM': 398158000000,'HON': 132107000000,'RTX': 117750000000,'AMZN': 1508000000000,'PEP': 230729000000,'UNH': 502863000000,'JNJ': 373273000000, 'V': 527197000000,'NVDA': 1152000000000,'AAPL': 3004000000000,'MSFT': 2760000000000,'GOOGL': 1676000000000}
 
-# ---- 3 diff --- python commands ----
-# ------  def correct_sleeping_function():   def sleeping_cmd_fn():   def count_cmd_fn():
-# -------  def print_cmd_fn():  def wrong_sleeping_function():
 
 # ----- regular functions ----------
+# ----- date format --------------
 def convert_date(x):
     func_date = dt.datetime.fromtimestamp(x).strftime('%Y-%m-%d')
     return func_date
@@ -136,6 +133,10 @@ def convert_date_time(x):
     func_date_time = dt.datetime.fromtimestamp(x).strftime('%Y-%m-%d %H:%M:%S')
     return func_date_time
 
+# ----- definition of confidence level --------------
+# ------- confidence = 1.00 (high) if the prediction and sentiment agree -------
+# ------- confidence = 0.00 (low) if the prediction and sentiment disagree -----
+# ------- confidence = 0.50 (medium) if the sentiment is neutral -----
 
 def categorise(row):
     if row['pred'] > 0 and row['sentiment'] ==1:
@@ -150,6 +151,7 @@ def categorise(row):
 
 # -------- python execution functions ----------------
 
+# -------- step 1 (tp_1): pull new data and calculate returns etc.
 def step1_pull_stock_data():
     tickers = tickers_pull
     ohlc = yf.download(tickers, period="60mo") # 60 months
@@ -166,7 +168,8 @@ def step1_pull_stock_data():
     returns.to_csv('/home/edsharecourse/projdatabucket/df.csv', index ='Date')
     prices.to_csv('/home/edsharecourse/projdatabucket/prices.csv', index ='Date')
     market_prices_BL_raw.to_csv('/home/edsharecourse/projdatabucket/market_prices_BL_raw.csv', index='Date') 
-    
+
+# -------- step 2 (tp_2): fit XGBoost and then make prediction based on new data and calculate returns etc. -----
 def step2_ml_xg():
     # ----- XGBoost Parameters ------------
     xg_max_depth=50
@@ -208,7 +211,7 @@ def step2_ml_xg():
     next_day_preds_df.to_csv('/home/edsharecourse/projdatabucket/next_day_preds_df.csv', index=True)
     with open('/home/edsharecourse/projdatabucket/saved_dictionary.pkl', 'wb') as f_next_day_preds:
         pickle.dump(next_day_preds, f_next_day_preds)
-
+# -------- step 3 (tp_3): pull news feed and estimate sentiment for each news -----
 def step3_news_feed():    
     stock_list = tickers_pull
     tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
@@ -218,10 +221,7 @@ def step3_news_feed():
     # stock_list =  ['XOM']
     # count=3
     for stock in stock_list:
-        # ohlc = yf.download(tickers_pull, start="2018-11-13", end="2023-11-13")
-        # count = 0 ==> news_series = finnhub_client.company_news(stock, _from="2022-11-04", to="2023-10-20")
-        # count = 1 ==> news_series = finnhub_client.company_news(stock, _from="2022-11-04", to="2023-09-12")
-        # count = 2 ==> news_series = finnhub_client.company_news(stock, _from="2022-11-04", to="2023-07-25")
+
         news_series = finnhub_client.company_news(stock, _from=yesterday, to=today)
         if news_series == []:
             print("stock news "+stock+" is empty")
@@ -271,6 +271,8 @@ def step3_news_feed():
     print (sentiment_list)
     sentiment_daily.to_csv('/home/edsharecourse/projdatabucket/sentiment_daily.csv', index=True)
     
+# -------- step 4 (tp_4): run Black Litterman using pypfopt API to get stock holding (portfolio) recommendation -----    
+# -------- and then generate previous days performance (portfolio return, standard deviation, and Sharpe-ratio ------  
 def step4_bl_weight():  
     # def black_litterman_weight(next_day_preds_df, sentiment_daily):
     # tickers_pull= ['HON', 'PEP', 'RTX', 'UNH', 'XOM']
@@ -361,6 +363,7 @@ def step4_bl_weight():
     w_hist_app = pd.concat([w_hist, weights_ML2_GBReg_df])
     w_hist = w_hist_app.tail(30)
     w_hist.to_csv('/home/edsharecourse/projdatabucket/w_hist.csv', index_label='Date')
+# -------- step 5 (tp_5): Save the reporting files into Google Cloud databucket location   -----    
 
 def step5_save_report():  
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/edsharecourse/eecs6893-399919-d331dd0aefd0.json" 
@@ -420,7 +423,7 @@ with DAG(
     'final_eecs6893_port_opt_airflow_v2',
     default_args=default_args,
     description='final_eecs6893_port_opt_airflow_v2 DAG',
-    schedule_interval='0 8 * * 1-5',  # == Here, set the schedule of running 8 am working days
+    schedule_interval='0 8 * * 1-5',  # == Here, set the schedule of running 8 am working days (1-5)
     start_date=datetime(2021, 1, 1),          # == Here, set the start_date to present date or the past date
     catchup=False,
     tags=['example'],
@@ -485,10 +488,6 @@ with DAG(
 
     # task dependencies 
 
-#    t1 >> [t2_1, t2_2, t2_3]
-#    t2_1 >> t3_1
-#    t2_2 >> t3_2
-#    [t2_3, t3_1, t3_2] >> t4_1
 
 
 tp_1 >> tp_2
